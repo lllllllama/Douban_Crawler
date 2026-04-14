@@ -41,6 +41,7 @@ python scripts/run_requests_pipeline.py
 python scripts/clean_data.py
 python scripts/analyze_data.py
 scrapy crawl top250
+scrapy crawl top250 -a list_page_count=1 -a movie_limit=1
 ```
 
 常用环境变量：
