@@ -1,6 +1,7 @@
 from _bootstrap import ROOT_DIR  # noqa: F401
-from douban_crawler.cli import main
+from douban_crawler.analysis.data_cleaning import DataCleaner
 
 
 if __name__ == "__main__":
-    main()
+    cleaner = DataCleaner()
+    cleaner.clean()
