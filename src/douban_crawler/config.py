@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,6 +24,7 @@ class Settings:
     timeout: int = 20
     max_workers: int = 4
     comment_target_count: int = 15
+    list_page_count: int = 10
     headers_pool: list[str] = field(
         default_factory=lambda: [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -33,7 +35,13 @@ class Settings:
             "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         ]
     )
-    proxies: list[str] = field(default_factory=list)
+    proxies: list[str] = field(
+        default_factory=lambda: [
+            item.strip()
+            for item in os.getenv("DOUBAN_PROXY_POOL", "").split(",")
+            if item.strip()
+        ]
+    )
 
     def ensure_directories(self) -> None:
         for path in (
