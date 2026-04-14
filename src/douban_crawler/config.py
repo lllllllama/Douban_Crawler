@@ -22,9 +22,11 @@ class Settings:
     detail_delay_range: tuple[float, float] = (1.0, 4.0)
     max_retries: int = 4
     timeout: int = 20
-    max_workers: int = 4
+    max_workers: int = int(os.getenv("DOUBAN_MAX_WORKERS", "4"))
     comment_target_count: int = 15
-    list_page_count: int = 10
+    list_page_count: int = int(os.getenv("DOUBAN_LIST_PAGE_COUNT", "10"))
+    movie_limit: int = int(os.getenv("DOUBAN_MOVIE_LIMIT", "0"))
+    cookie_wait_seconds: int = int(os.getenv("DOUBAN_COOKIE_WAIT_SECONDS", "8"))
     headers_pool: list[str] = field(
         default_factory=lambda: [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

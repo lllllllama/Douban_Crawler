@@ -12,6 +12,7 @@ from douban_crawler.utils.exporters import export_csv, export_json
 from douban_crawler.utils.http import RequestOptions, RotatingSession
 from douban_crawler.utils.logging_utils import configure_logger
 from douban_crawler.utils.robots import build_robot_parser, is_allowed
+from douban_crawler.utils.text import clean_text
 
 
 class Top250RequestsCrawler:
@@ -65,28 +66,24 @@ class Top250RequestsCrawler:
             title_cn = title_nodes[0].get_text(strip=True) if title_nodes else ""
             title_foreign = ""
             if len(title_nodes) > 1:
-                title_foreign = self._clean_text(title_nodes[1].get_text(strip=True))
+                title_foreign = clean_text(title_nodes[1].get_text(strip=True))
             elif other_title:
-                title_foreign = self._clean_text(other_title.get_text(" ", strip=True))
+                title_foreign = clean_text(other_title.get_text(" ", strip=True))
 
             parsed.append(
                 MovieRecord(
                     movie_id=movie_id_match.group(1) if movie_id_match else "",
                     rank=int(node.select_one(".pic em").get_text(strip=True)),
-                    title_cn=self._clean_text(title_cn),
+                    title_cn=clean_text(title_cn),
                     title_foreign=title_foreign,
                     score=float(score_node.get_text(strip=True)) if score_node else 0.0,
                     votes=int(votes_match.group(1)) if votes_match else 0,
-                    people_info=self._clean_text(people_info),
-                    quote=self._clean_text(quote_node.get_text(" ", strip=True)) if quote_node else "",
+                    people_info=clean_text(people_info),
+                    quote=clean_text(quote_node.get_text(" ", strip=True)) if quote_node else "",
                     detail_url=detail_url,
                 )
             )
         return parsed
-
-    @staticmethod
-    def _clean_text(value: str) -> str:
-        return re.sub(r"\s+", " ", value.replace("\xa0", " ")).strip(" /")
 
     def _export(self, records: list[MovieRecord]) -> None:
         rows = [record.to_dict() for record in records]

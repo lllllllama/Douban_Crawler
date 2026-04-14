@@ -43,6 +43,21 @@ python scripts/analyze_data.py
 scrapy crawl top250
 ```
 
+常用环境变量：
+
+```bash
+set DOUBAN_LIST_PAGE_COUNT=10
+set DOUBAN_MOVIE_LIMIT=0
+set DOUBAN_MAX_WORKERS=4
+set DOUBAN_COOKIE_WAIT_SECONDS=8
+```
+
+说明：
+
+- `DOUBAN_MOVIE_LIMIT=0` 表示全量抓取
+- 豆瓣详情页与短评页先由 Selenium 获取 Cookie，再交给 `requests` 抓取
+- IMDb 会优先尝试抓取评分；若目标站返回 WAF/403，则保留 `imdb_id` 并将 `imdb_rating` 置空
+
 ## 合规说明
 
 - 仅针对公开、无需登录页面
