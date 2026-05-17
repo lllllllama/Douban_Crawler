@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -15,13 +16,21 @@ class MovieRecord:
     quote: str
     detail_url: str
     year: int | None = None
-    runtime: str = ""
+    runtime: int | None = None
     genres: list[str] = field(default_factory=list)
     imdb_id: str = ""
+    imdb_url: str = ""
     imdb_rating: float | None = None
     summary: str = ""
     poster_url: str = ""
     poster_path: str = ""
+    # 新增：详情页爬取的属性
+    directors: list[str] = field(default_factory=list)
+    writers: list[str] = field(default_factory=list)
+    actors: list[str] = field(default_factory=list)
+    country: str = ""
+    language: str = ""
+    comments: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         payload = asdict(self)
