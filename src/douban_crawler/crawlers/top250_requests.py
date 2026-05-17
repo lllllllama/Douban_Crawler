@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import brotli
 import re
+import time
+import random
 from pathlib import Path
 
+import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
 from douban_crawler.config import RAW_DATA_DIR, settings
 from douban_crawler.models import MovieRecord
 from douban_crawler.utils.exporters import export_csv, export_json
-from douban_crawler.utils.http import RequestOptions, RotatingSession
 from douban_crawler.utils.logging_utils import configure_logger
 from douban_crawler.utils.robots import build_robot_parser, is_allowed
 from douban_crawler.utils.text import clean_text
@@ -19,8 +22,17 @@ class Top250RequestsCrawler:
     def __init__(self) -> None:
         settings.ensure_directories()
         self.logger = configure_logger()
-        self.session = RotatingSession()
         self.robot_parser = build_robot_parser(settings.base_url)
+
+        # 使用标准 requests.Session 替代 RotatingSession
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+        })
 
     def crawl(self) -> list[MovieRecord]:
         records: list[MovieRecord] = []
@@ -31,8 +43,51 @@ class Top250RequestsCrawler:
                 self.logger.warning("Skip disallowed URL: %s", url)
                 continue
 
-            response = self.session.get(url, params=params, options=RequestOptions())
-            page_records = self._parse_list_page(response.text)
+            # 随机延迟，避免请求过快
+            time.sleep(random.uniform(3, 6))
+
+            response = self.session.get(
+                url,
+                params=params,
+                headers={'Referer': 'https://movie.douban.com/'}
+            )
+
+            # 第一页时保存调试信息
+            if page_index == 0:
+                # 保存原始二进制响应
+                with open("debug_page1_raw.bin", "wb") as f:
+                    f.write(response.content)
+                # 保存响应头信息
+                with open("debug_headers.txt", "w", encoding="utf-8") as f:
+                    f.write(f"Status: {response.status_code}\n")
+                    for k, v in response.headers.items():
+                        f.write(f"{k}: {v}\n")
+                self.logger.info("Saved raw response to debug_page1_raw.bin and headers to debug_headers.txt")
+
+            if response.status_code != 200:
+                self.logger.error(f"请求失败，状态码：{response.status_code}")
+                continue
+
+            # 处理 Brotli 压缩（关键修复）
+            # 安全处理 Brotli 压缩
+            if response.headers.get('Content-Encoding') == 'br':
+                try:
+                    html = brotli.decompress(response.content).decode('utf-8')
+                except Exception:
+                    # 如果解压失败，说明 content 可能已被 requests 自动解压，直接使用 text
+                    html = response.text
+            else:
+                html = response.text
+
+            # 第一页时保存解压后的HTML用于调试
+            if page_index == 0:
+                with open("debug_page1.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+                self.logger.info("Saved decompressed HTML to debug_page1.html")
+                # 打印前500字符预览
+                print("Response preview:", html[:500])
+
+            page_records = self._parse_list_page(html)
             records.extend(page_records)
             self.logger.info("Parsed %s items from page %s", len(page_records), page_index + 1)
 
