@@ -35,9 +35,15 @@ class SQLiteStore:
                     year INTEGER,
                     runtime TEXT,
                     genres TEXT,
+                    imdb_url TEXT,
                     imdb_id TEXT,
                     imdb_rating REAL,
                     summary TEXT,
+                    directors TEXT,
+                    writers TEXT,
+                    actors TEXT,
+                    country TEXT,
+                    language TEXT,
                     poster_url TEXT,
                     poster_path TEXT
                 )
@@ -56,7 +62,24 @@ class SQLiteStore:
                 )
                 """
             )
+            self._ensure_movie_columns(conn)
             conn.commit()
+
+    def _ensure_movie_columns(self, conn: sqlite3.Connection) -> None:
+        existing = {
+            row[1] for row in conn.execute("PRAGMA table_info(movies)").fetchall()
+        }
+        desired = {
+            "imdb_url": "TEXT",
+            "directors": "TEXT",
+            "writers": "TEXT",
+            "actors": "TEXT",
+            "country": "TEXT",
+            "language": "TEXT",
+        }
+        for column, column_type in desired.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE movies ADD COLUMN {column} {column_type}")
 
     def save_movies(self, movies: Iterable[MovieRecord]) -> None:
         rows = [movie.to_dict() for movie in movies]
@@ -65,12 +88,14 @@ class SQLiteStore:
                 """
                 INSERT OR REPLACE INTO movies (
                     movie_id, rank, title_cn, title_foreign, score, votes, people_info,
-                    quote, detail_url, year, runtime, genres, imdb_id, imdb_rating,
-                    summary, poster_url, poster_path
+                    quote, detail_url, year, runtime, genres, imdb_url, imdb_id, imdb_rating,
+                    summary, directors, writers, actors, country, language, poster_url,
+                    poster_path
                 ) VALUES (
                     :movie_id, :rank, :title_cn, :title_foreign, :score, :votes, :people_info,
-                    :quote, :detail_url, :year, :runtime, :genres, :imdb_id, :imdb_rating,
-                    :summary, :poster_url, :poster_path
+                    :quote, :detail_url, :year, :runtime, :genres, :imdb_url, :imdb_id,
+                    :imdb_rating, :summary, :directors, :writers, :actors, :country,
+                    :language, :poster_url, :poster_path
                 )
                 """,
                 rows,

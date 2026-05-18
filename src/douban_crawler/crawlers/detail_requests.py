@@ -13,6 +13,7 @@ from tqdm import tqdm
 from douban_crawler.config import settings
 from douban_crawler.models import MovieRecord
 from douban_crawler.utils.logging_utils import configure_logger
+from douban_crawler.utils.posters import download_poster
 from douban_crawler.utils.text import clean_text
 
 
@@ -41,6 +42,16 @@ class DetailRequestsCrawler:
                 # 1. 获取详情页
                 detail_html = self._get_html(movie.detail_url)
                 self._parse_detail(detail_html, movie)
+                if movie.poster_url:
+                    try:
+                        movie.poster_path = download_poster(
+                            movie.poster_url,
+                            title=movie.title_cn,
+                            rank=movie.rank,
+                            session=self.session,
+                        )
+                    except Exception as e:
+                        self.logger.warning("海报下载失败 %s: %s", movie.title_cn, e)
 
                 # 2. 获取短评页
                 comments_url = f"{movie.detail_url}comments?status=P"
@@ -52,22 +63,33 @@ class DetailRequestsCrawler:
                 continue
 
     def _get_html(self, url: str) -> str:
-        response = self.session.get(
-            url,
-            cookies=self.cookies,
-            headers={'Referer': 'https://movie.douban.com/'}
-        )
-        if response.status_code != 200:
-            raise RuntimeError(f"请求失败，状态码：{response.status_code}")
-
-        # 处理 Brotli 压缩（关键修复）
-        # 安全处理 Brotli 压缩
-        if response.headers.get('Content-Encoding') == 'br':
+        last_error: Exception | None = None
+        for attempt in range(1, settings.max_retries + 1):
             try:
-                return brotli.decompress(response.content).decode('utf-8')
-            except Exception:
+                response = self.session.get(
+                    url,
+                    cookies=self.cookies,
+                    headers={
+                        "Referer": "https://movie.douban.com/",
+                        "User-Agent": random.choice(settings.headers_pool),
+                    },
+                    timeout=settings.timeout,
+                )
+                if response.status_code in {403, 429, 500, 502, 503, 504}:
+                    raise RuntimeError(f"status {response.status_code}")
+                response.raise_for_status()
+                if response.headers.get("Content-Encoding") == "br":
+                    try:
+                        return brotli.decompress(response.content).decode("utf-8")
+                    except Exception:
+                        return response.text
                 return response.text
-        return response.text
+            except Exception as exc:
+                last_error = exc
+                self.logger.warning("详情请求失败 %s/%s: %s", attempt, settings.max_retries, exc)
+                if settings.enable_exponential_backoff:
+                    time.sleep(min(2 ** attempt, 20))
+        raise RuntimeError(f"请求失败：{url}") from last_error
 
     def _parse_detail(self, html: str, movie: MovieRecord) -> None:
         soup = BeautifulSoup(html, "lxml")
@@ -78,7 +100,15 @@ class DetailRequestsCrawler:
         info_text = info_node.get_text(" ", strip=True)
 
         # 提取年份
-        year_match = re.search(r"(\d{4})", info_text)
+        year_source = " ".join(
+            [
+                info_text,
+                soup.select_one("#content span.year").get_text(" ", strip=True)
+                if soup.select_one("#content span.year")
+                else "",
+            ]
+        )
+        year_match = re.search(r"(\d{4})", year_source)
         if year_match:
             movie.year = int(year_match.group(1))
 
@@ -126,11 +156,18 @@ class DetailRequestsCrawler:
         imdb_node = info_node.select_one("a[href*='imdb.com']")
         if imdb_node:
             movie.imdb_url = imdb_node["href"]
+            imdb_match = re.search(r"title/(tt\d+)", movie.imdb_url)
+            if imdb_match:
+                movie.imdb_id = imdb_match.group(1)
 
         # 提取剧情简介
         summary_node = soup.select_one("span[property='v:summary']")
         if summary_node:
             movie.summary = clean_text(summary_node.get_text(" ", strip=True))
+
+        poster_node = soup.select_one("#mainpic img")
+        if poster_node and poster_node.get("src"):
+            movie.poster_url = str(poster_node["src"])
 
     def _parse_comments(self, html: str, movie: MovieRecord) -> None:
         soup = BeautifulSoup(html, "lxml")
@@ -139,15 +176,17 @@ class DetailRequestsCrawler:
             user_node = node.select_one(".comment-info a")
             vote_node = node.select_one(".comment-info .rating")
             time_node = node.select_one(".comment-time")
-            content_node = node.select_one(".comment-content")
+            content_node = node.select_one(".comment-content") or node.select_one(".short")
 
             user = clean_text(user_node.get_text(strip=True)) if user_node else ""
             rating = 0
             if vote_node:
-                rating_match = re.search(r"allstar(\d+)", vote_node.get("class", [""])[0] if vote_node.get("class") else "")
+                rating_match = re.search(r"allstar(\d+)", " ".join(vote_node.get("class", [])))
                 if rating_match:
                     rating = int(rating_match.group(1)) // 10
-            time_str = clean_text(time_node.get_text(strip=True)) if time_node else ""
+            time_str = clean_text(
+                (time_node.get("title") or time_node.get_text(strip=True)) if time_node else ""
+            )
             content = clean_text(content_node.get_text(" ", strip=True)) if content_node else ""
 
             comments.append({

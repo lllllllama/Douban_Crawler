@@ -35,6 +35,10 @@ class MovieRecord:
     def to_dict(self) -> dict:
         payload = asdict(self)
         payload["genres"] = ",".join(self.genres)
+        payload["directors"] = ",".join(self.directors)
+        payload["writers"] = ",".join(self.writers)
+        payload["actors"] = ",".join(self.actors)
+        payload.pop("comments", None)
         return payload
 
 

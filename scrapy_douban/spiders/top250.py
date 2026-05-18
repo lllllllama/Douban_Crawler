@@ -86,11 +86,17 @@ class Top250Spider(scrapy.Spider):
                 "year": self._extract_year(response.css("#content span.year::text").get()),
                 "runtime": clean_text(response.css('span[property="v:runtime"]::text').get() or ""),
                 "genres": [clean_text(text) for text in response.css('span[property="v:genre"]::text').getall()],
+                "imdb_url": imdb_href,
                 "imdb_id": imdb_match.group(1) if imdb_match else "",
                 "imdb_rating": None,
                 "summary": clean_text(
                     " ".join(response.css('span[property="v:summary"] *::text, span[property="v:summary"]::text').getall())
                 ),
+                "directors": [clean_text(text) for text in response.css("a[rel='v:directedBy']::text").getall()],
+                "writers": self._extract_info_links(response.text, "编剧"),
+                "actors": [clean_text(text) for text in response.css("a[rel='v:starring']::text").getall()[:5]],
+                "country": self._extract_info_text(response.text, "制片国家/地区"),
+                "language": self._extract_info_text(response.text, "语言"),
                 "poster_url": response.css("#mainpic img::attr(src)").get() or "",
                 "poster_path": "",
             }
@@ -152,3 +158,15 @@ class Top250Spider(scrapy.Spider):
             return None
         match = re.search(r"(\d{4})", text)
         return int(match.group(1)) if match else None
+
+    @staticmethod
+    def _extract_info_text(html: str, label: str) -> str:
+        match = re.search(rf"{re.escape(label)}:</span>\s*([^<]+)", html)
+        return clean_text(match.group(1)) if match else ""
+
+    @staticmethod
+    def _extract_info_links(html: str, label: str) -> list[str]:
+        match = re.search(rf"{re.escape(label)}</span>:\s*(.*?)(?:<br/>|\n)", html, re.DOTALL)
+        if not match:
+            return []
+        return [clean_text(text) for text in re.findall(r"<a[^>]*>([^<]+)</a>", match.group(1))]

@@ -11,9 +11,15 @@ CREATE TABLE IF NOT EXISTS movies (
     year INTEGER,
     runtime TEXT,
     genres TEXT,
+    imdb_url TEXT,
     imdb_id TEXT,
     imdb_rating REAL,
     summary TEXT,
+    directors TEXT,
+    writers TEXT,
+    actors TEXT,
+    country TEXT,
+    language TEXT,
     poster_url TEXT,
     poster_path TEXT
 );

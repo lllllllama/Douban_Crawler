@@ -27,6 +27,13 @@ class DataCleaner:
         for column in ["rank", "score", "votes", "year", "imdb_rating"]:
             if column in movies.columns:
                 movies[column] = pd.to_numeric(movies[column], errors="coerce")
+        if "runtime" in movies.columns:
+            movies["runtime"] = (
+                movies["runtime"]
+                .astype("string")
+                .str.extract(r"(\d+)", expand=False)
+                .pipe(pd.to_numeric, errors="coerce")
+            )
 
         if "comment_time" in comments.columns:
             comments["comment_time"] = pd.to_datetime(

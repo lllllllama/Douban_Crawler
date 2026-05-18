@@ -43,56 +43,52 @@ class Top250RequestsCrawler:
                 self.logger.warning("Skip disallowed URL: %s", url)
                 continue
 
-            # 随机延迟，避免请求过快
-            time.sleep(random.uniform(3, 6))
-
-            response = self.session.get(
-                url,
-                params=params,
-                headers={'Referer': 'https://movie.douban.com/'}
-            )
-
-            # 第一页时保存调试信息
-            if page_index == 0:
-                # 保存原始二进制响应
-                with open("debug_page1_raw.bin", "wb") as f:
-                    f.write(response.content)
-                # 保存响应头信息
-                with open("debug_headers.txt", "w", encoding="utf-8") as f:
-                    f.write(f"Status: {response.status_code}\n")
-                    for k, v in response.headers.items():
-                        f.write(f"{k}: {v}\n")
-                self.logger.info("Saved raw response to debug_page1_raw.bin and headers to debug_headers.txt")
-
-            if response.status_code != 200:
-                self.logger.error(f"请求失败，状态码：{response.status_code}")
-                continue
-
-            # 处理 Brotli 压缩（关键修复）
-            # 安全处理 Brotli 压缩
-            if response.headers.get('Content-Encoding') == 'br':
-                try:
-                    html = brotli.decompress(response.content).decode('utf-8')
-                except Exception:
-                    # 如果解压失败，说明 content 可能已被 requests 自动解压，直接使用 text
-                    html = response.text
-            else:
-                html = response.text
-
-            # 第一页时保存解压后的HTML用于调试
-            if page_index == 0:
-                with open("debug_page1.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-                self.logger.info("Saved decompressed HTML to debug_page1.html")
-                # 打印前500字符预览
-                print("Response preview:", html[:500])
+            html = self._get_list_html(url, params=params)
 
             page_records = self._parse_list_page(html)
             records.extend(page_records)
+            if settings.movie_limit:
+                records = records[: settings.movie_limit]
             self.logger.info("Parsed %s items from page %s", len(page_records), page_index + 1)
+            if settings.movie_limit and len(records) >= settings.movie_limit:
+                break
 
         self._export(records)
         return records
+
+    def _get_list_html(self, url: str, *, params: dict[str, str]) -> str:
+        last_error: Exception | None = None
+        for attempt in range(1, settings.max_retries + 1):
+            time.sleep(random.uniform(1, 4))
+            try:
+                response = self.session.get(
+                    url,
+                    params=params,
+                    headers={
+                        "Referer": "https://movie.douban.com/",
+                        "User-Agent": random.choice(settings.headers_pool),
+                    },
+                    timeout=settings.timeout,
+                )
+                if response.status_code in {403, 429, 500, 502, 503, 504}:
+                    raise RuntimeError(f"status {response.status_code}")
+                response.raise_for_status()
+                return self._decode_response(response)
+            except Exception as exc:
+                last_error = exc
+                self.logger.warning("List request failed attempt %s/%s: %s", attempt, settings.max_retries, exc)
+                if settings.enable_exponential_backoff:
+                    time.sleep(min(2 ** attempt, 20))
+        raise RuntimeError(f"request failed for {url}") from last_error
+
+    @staticmethod
+    def _decode_response(response: requests.Response) -> str:
+        if response.headers.get("Content-Encoding") == "br":
+            try:
+                return brotli.decompress(response.content).decode("utf-8")
+            except Exception:
+                return response.text
+        return response.text
 
     def _parse_list_page(self, html: str) -> list[MovieRecord]:
         soup = BeautifulSoup(html, "lxml")
