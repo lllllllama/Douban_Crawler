@@ -28,6 +28,7 @@ class RotatingSession:
             "User-Agent": random.choice(settings.headers_pool),
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Referer": "https://movie.douban.com/",
+            "Connection": "keep-alive"
         }
 
     def _pick_proxy(self) -> dict[str, str] | None:
@@ -65,7 +66,6 @@ class RotatingSession:
                 return resp
             except requests.RequestException as e:
                 last_error = e
-                proxy = self._pick_proxy()
                 if proxy:
                     self.blacklisted_proxies.add(next(iter(proxy.values())))
 
