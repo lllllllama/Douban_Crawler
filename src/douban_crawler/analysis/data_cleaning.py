@@ -5,6 +5,7 @@ import sqlite3
 import pandas as pd
 
 from douban_crawler.config import DB_FILE, PROCESSED_DATA_DIR, settings
+from douban_crawler.utils.list_metadata import parse_list_people_info
 
 
 class DataCleaner:
@@ -23,6 +24,7 @@ class DataCleaner:
         comments = comments.replace({"": pd.NA}).drop_duplicates(
             subset=["movie_id", "user_name", "comment_time", "content"]
         ).copy()
+        movies = self._fill_list_metadata(movies)
 
         for column in ["rank", "score", "votes", "year", "imdb_rating"]:
             if column in movies.columns:
@@ -56,3 +58,37 @@ class DataCleaner:
             date_format="iso",
         )
         return movies, comments
+
+    def _fill_list_metadata(self, movies: pd.DataFrame) -> pd.DataFrame:
+        if movies.empty or "people_info" not in movies.columns:
+            return movies
+
+        for column in ["year", "genres", "directors", "actors", "country"]:
+            if column not in movies.columns:
+                movies[column] = pd.NA
+
+        for index, people_info in movies["people_info"].items():
+            parsed = parse_list_people_info(people_info)
+            self._fill_scalar(movies, index, "year", parsed["year"])
+            self._fill_scalar(movies, index, "country", parsed["country"])
+            self._fill_sequence(movies, index, "genres", parsed["genres"])
+            self._fill_sequence(movies, index, "directors", parsed["directors"])
+            self._fill_sequence(movies, index, "actors", parsed["actors"])
+
+        return movies
+
+    @staticmethod
+    def _fill_scalar(movies: pd.DataFrame, index: int, column: str, value: object) -> None:
+        if value in (None, ""):
+            return
+        current = movies.at[index, column]
+        if pd.isna(current) or str(current).strip() == "":
+            movies.at[index, column] = value
+
+    @staticmethod
+    def _fill_sequence(movies: pd.DataFrame, index: int, column: str, values: list[str]) -> None:
+        if not values:
+            return
+        current = movies.at[index, column]
+        if pd.isna(current) or str(current).strip() == "":
+            movies.at[index, column] = ",".join(values)

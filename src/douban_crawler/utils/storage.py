@@ -76,6 +76,8 @@ class SQLiteStore:
             "actors": "TEXT",
             "country": "TEXT",
             "language": "TEXT",
+            "poster_url": "TEXT",
+            "poster_path": "TEXT",
         }
         for column, column_type in desired.items():
             if column not in existing:

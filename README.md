@@ -1,5 +1,59 @@
 # Douban Crawler
 
+## GitHub Actions 自动更新
+
+本项目提供 `.github/workflows/auto-update-dashboard.yml`，用于低频自动刷新数据分析结果、图表、HTML 看板和实验报告。工作流名称为 `Auto Update Douban Dashboard`。
+
+手动触发方法：
+
+1. 打开 GitHub 仓库的 `Actions` 页面。
+2. 选择 `Auto Update Douban Dashboard`。
+3. 点击 `Run workflow`。
+4. 根据需要设置参数后运行。
+
+参数说明：
+
+- `run_crawler`：是否先运行爬虫。默认 `false`，只基于仓库已有数据重新清洗、分析和生成报告。第一次没有数据时需要手动设置为 `true`。
+- `list_page_count`：豆瓣 Top250 列表页数量，手动触发默认 `10`，对应 Top250 全量列表页。
+- `movie_limit`：电影数量限制，手动触发默认 `0`，表示不限制并爬取前 250 个；全量更新请谨慎手动触发。
+- `max_workers`：爬虫最大并发数，默认 `2`，建议保持低并发。
+
+定时任务：
+
+- 默认每周日 `03:00 UTC` 运行一次。
+- 定时触发默认不运行爬虫，只做低频、温和的数据分析结果刷新。
+- 如需重新采集数据，请手动触发并设置 `run_crawler=true`，同时设置合理的低频参数。
+
+自动生成和更新的文件：
+
+- `data/douban_movies.sqlite3`
+- `data/raw/`
+- `data/processed/`
+- `output/charts/`
+- `output/report.html`
+- `output/data_quality_report.md`
+- `output/analysis_summary.md`
+- `doc/豆瓣电影Top250爬虫数据采集与分析系统实验报告.docx`
+
+Artifact 下载：
+
+1. 打开对应 workflow run。
+2. 在页面底部 `Artifacts` 区域下载 `douban-dashboard-output`。
+3. Artifact 包含 `output/`、`doc/`、`data/processed/` 和 `data/raw/`。
+
+数据缺失处理：
+
+- 如果 `run_crawler=false` 且仓库中没有 `data/douban_movies.sqlite3` 或 `data/processed/*.csv`，workflow 会失败并提示：
+  `No existing data found. Please manually run this workflow with run_crawler=true first.`
+- 这样可以避免生成空报告掩盖数据缺失问题。
+
+合规说明：
+
+- 该工作流用于课程实验数据分析结果的低频更新。
+- 默认不自动全量高频爬取。
+- 请遵守目标网站 `robots.txt` 和访问频率限制。
+- 全量更新应手动触发，并使用合理的低频、低并发参数。
+
 豆瓣电影 Top250 课程实验项目。项目同时提供 `requests` 版本与 `Scrapy` 版本的爬虫流程，并包含数据存储、清洗、分析与可视化脚本。
 
 ## 功能概览

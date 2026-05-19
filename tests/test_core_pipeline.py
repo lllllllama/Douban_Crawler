@@ -9,6 +9,7 @@ from douban_crawler.crawlers.detail_requests import DetailRequestsCrawler
 from douban_crawler.crawlers.top250_requests import Top250RequestsCrawler
 from douban_crawler.models import CommentRecord, MovieRecord
 from douban_crawler.utils import storage as storage_module
+from douban_crawler.utils.list_metadata import parse_list_people_info
 from douban_crawler.utils.posters import poster_filename
 from douban_crawler.utils.storage import SQLiteStore
 
@@ -86,6 +87,35 @@ def test_parse_detail_and_comments_extracts_extended_fields() -> None:
     assert movie.poster_url.endswith("poster.jpg")
     assert movie.comments[0]["user"] == "用户A"
     assert movie.comments[0]["rating"] == 5
+
+
+def test_parse_list_people_info_extracts_metadata() -> None:
+    info = (
+        "导演: 弗兰克·德拉邦特 Frank Darabont 主演: 蒂姆·罗宾斯 Tim Robbins / "
+        "摩根·弗里曼 Morgan Freeman 1994 / 美国 / 犯罪 剧情"
+    )
+
+    parsed = parse_list_people_info(info)
+
+    assert parsed["year"] == 1994
+    assert parsed["country"] == "美国"
+    assert parsed["genres"] == ["犯罪", "剧情"]
+    assert parsed["directors"] == ["弗兰克·德拉邦特 Frank Darabont"]
+    assert parsed["actors"] == ["蒂姆·罗宾斯 Tim Robbins", "摩根·弗里曼 Morgan Freeman"]
+
+
+def test_parse_list_people_info_handles_parenthesized_release_year() -> None:
+    info = (
+        "导演: 万籁鸣 Laiming Wan 主演: 邱岳峰 Yuefeng Qiu / 富润生 Runsheng Fu... "
+        "1961(中国大陆) / 1964(中国大陆) / 1978(中国大陆) / 中国大陆 / 剧情 动画 奇幻 古装"
+    )
+
+    parsed = parse_list_people_info(info)
+
+    assert parsed["year"] == 1961
+    assert parsed["country"] == "中国大陆"
+    assert parsed["genres"] == ["剧情", "动画", "奇幻", "古装"]
+    assert parsed["actors"] == ["邱岳峰 Yuefeng Qiu", "富润生 Runsheng Fu"]
 
 
 def test_sqlite_store_saves_extended_movie_fields(tmp_path: Path, monkeypatch) -> None:

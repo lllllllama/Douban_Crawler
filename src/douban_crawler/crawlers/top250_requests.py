@@ -13,6 +13,7 @@ from tqdm import tqdm
 from douban_crawler.config import RAW_DATA_DIR, settings
 from douban_crawler.models import MovieRecord
 from douban_crawler.utils.exporters import export_csv, export_json
+from douban_crawler.utils.list_metadata import parse_list_people_info
 from douban_crawler.utils.logging_utils import configure_logger
 from douban_crawler.utils.robots import build_robot_parser, is_allowed
 from douban_crawler.utils.text import clean_text
@@ -104,12 +105,14 @@ class Top250RequestsCrawler:
                 continue
             vote_text = bd_node.get_text(" ", strip=True)
             detail_url = node.select_one(".hd a")["href"]
+            poster_node = node.select_one(".pic img")
             people_node = bd_node.select_one("p:not(.quote)")
             people_info = (
                 re.sub(r"\s+", " ", people_node.get_text(" ", strip=True))
                 if people_node
                 else ""
             )
+            list_metadata = parse_list_people_info(people_info)
             quote_node = node.select_one(".inq") or node.select_one(".quote span")
             movie_id_match = re.search(r"/subject/(\d+)/", detail_url)
             votes_match = re.search(r"(\d+)人评价", vote_text)
@@ -132,6 +135,12 @@ class Top250RequestsCrawler:
                     people_info=clean_text(people_info),
                     quote=clean_text(quote_node.get_text(" ", strip=True)) if quote_node else "",
                     detail_url=detail_url,
+                    year=list_metadata["year"],
+                    genres=list_metadata["genres"],
+                    directors=list_metadata["directors"],
+                    actors=list_metadata["actors"],
+                    country=list_metadata["country"],
+                    poster_url=str(poster_node.get("src", "")) if poster_node else "",
                 )
             )
         return parsed

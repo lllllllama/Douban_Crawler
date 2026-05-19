@@ -1,0 +1,169 @@
+# This workflow is for low-frequency updates of course experiment data analysis outputs.
+# It does not perform automatic full high-frequency crawling by default.
+# Please follow the target site's robots.txt and access-rate limits.
+# For full updates, trigger manually and choose conservative parameters.
+
+name: Auto Update Douban Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_crawler:
+        description: "Whether to run crawler before analysis"
+        type: boolean
+        default: false
+      list_page_count:
+        description: "Douban list page count"
+        type: string
+        default: "10"
+      movie_limit:
+        description: "Movie limit, 0 means full crawl"
+        type: string
+        default: "0"
+      max_workers:
+        description: "Crawler max workers"
+        type: string
+        default: "2"
+  schedule:
+    - cron: "0 3 * * 0"
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+
+    env:
+      RUN_CRAWLER: ${{ github.event_name == 'workflow_dispatch' && inputs.run_crawler == true && 'true' || 'false' }}
+      DOUBAN_LIST_PAGE_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.list_page_count || '1' }}
+      DOUBAN_MOVIE_LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.movie_limit || '20' }}
+      DOUBAN_MAX_WORKERS: ${{ github.event_name == 'workflow_dispatch' && inputs.max_workers || '2' }}
+      DOUBAN_COOKIE_WAIT_SECONDS: "8"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Show update configuration
+        run: |
+          set -euo pipefail
+          echo "event_name=${{ github.event_name }}"
+          echo "RUN_CRAWLER=${RUN_CRAWLER}"
+          echo "DOUBAN_LIST_PAGE_COUNT=${DOUBAN_LIST_PAGE_COUNT}"
+          echo "DOUBAN_MOVIE_LIMIT=${DOUBAN_MOVIE_LIMIT}"
+          echo "DOUBAN_MAX_WORKERS=${DOUBAN_MAX_WORKERS}"
+
+      - name: Check existing data
+        run: |
+          set -euo pipefail
+          if [[ "${RUN_CRAWLER}" == "true" ]]; then
+            echo "Crawler is enabled; data will be refreshed before analysis."
+            exit 0
+          fi
+
+          if [[ -f data/douban_movies.sqlite3 ]]; then
+            echo "Existing SQLite database found."
+            exit 0
+          fi
+
+          if compgen -G "data/processed/*.csv" > /dev/null; then
+            echo "Existing processed CSV files found."
+            exit 0
+          fi
+
+          echo "::error::No existing data found. Please manually run this workflow with run_crawler=true first."
+          exit 1
+
+      - name: Run crawler
+        if: env.RUN_CRAWLER == 'true'
+        run: |
+          set -euo pipefail
+          python scripts/run_requests_pipeline.py
+
+      - name: Clean data
+        run: |
+          set -euo pipefail
+          if [[ "${RUN_CRAWLER}" == "true" || -f data/douban_movies.sqlite3 ]]; then
+            if [[ ! -f data/douban_movies.sqlite3 ]]; then
+              echo "::error::Crawler finished but data/douban_movies.sqlite3 was not produced."
+              exit 1
+            fi
+            python scripts/clean_data.py
+          elif compgen -G "data/processed/*.csv" > /dev/null; then
+            echo "SQLite database is missing; using existing data/processed CSV files for analysis."
+          else
+            echo "::error::No existing data found. Please manually run this workflow with run_crawler=true first."
+            exit 1
+          fi
+
+      - name: Generate dashboard and charts
+        run: |
+          set -euo pipefail
+          python scripts/analyze_data.py
+
+      - name: Generate Word experiment report
+        run: |
+          set -euo pipefail
+          python scripts/build_experiment_report.py
+
+      - name: Upload dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: douban-dashboard-output
+          if-no-files-found: warn
+          path: |
+            output/
+            doc/
+            data/processed/
+            data/raw/
+            !**/.venv/**
+            !**/__pycache__/**
+
+      - name: Commit generated changes
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Working tree before staging:"
+          git status --short
+
+          paths=()
+          for path in output doc data/processed data/raw data/douban_movies.sqlite3; do
+            if [[ -e "${path}" ]]; then
+              paths+=("${path}")
+            fi
+          done
+
+          if [[ ${#paths[@]} -eq 0 ]]; then
+            echo "No generated paths found."
+            echo "No generated changes to commit."
+            exit 0
+          fi
+
+          git add -A -- "${paths[@]}"
+
+          echo "Working tree after staging:"
+          git status --short
+
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: auto update douban dashboard"
+          git push
