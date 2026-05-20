@@ -1,8 +1,14 @@
-# Douban Crawler
+# 🎬 Douban Crawler
+
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-online-2ea44f?logo=githubpages&logoColor=white)](https://lllllllama.github.io/Douban_Crawler/)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![Scrapy](https://img.shields.io/badge/Scrapy-supported-60A839?logo=scrapy&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-data-003B57?logo=sqlite&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 豆瓣电影 Top250 课程实验项目，包含数据采集、清洗、存储、分析、可视化看板和实验报告生成。
 
-## 在线看板
+## 🚀 在线看板
 
 - GitHub Pages: <https://lllllllama.github.io/Douban_Crawler/>
 - 发布目录: `docs/`
@@ -16,7 +22,15 @@
 
 保存后等待 1-2 分钟即可访问 Pages 地址。
 
-## 快速开始
+## ✨ 项目亮点
+
+- 🎞️ Top250 电影信息、详情页、热门短评采集。
+- 🧹 SQLite 存储、CSV/JSON 导出和 pandas 数据清洗。
+- 📊 评分、类型、导演、短评趋势、情感分析和词云可视化。
+- 📝 自动生成 HTML 看板和 Word/PDF 实验报告。
+- ⚙️ 支持 requests 流程、Scrapy 流程和 GitHub Actions 低频更新。
+
+## ⚡ 快速开始
 
 ```bash
 python -m venv .venv
@@ -41,7 +55,7 @@ scrapy crawl top250
 scrapy crawl top250 -a list_page_count=1 -a movie_limit=1
 ```
 
-## 常用参数
+## 🧩 常用参数
 
 Windows PowerShell 示例：
 
@@ -59,7 +73,7 @@ $env:DOUBAN_COOKIE_WAIT_SECONDS="8"
 - `DOUBAN_MAX_WORKERS`: requests 详情页并发数，建议保持低并发。
 - `DOUBAN_COOKIE_WAIT_SECONDS`: Selenium 获取 Cookie 时的等待时间。
 
-## 输出目录
+## 📦 输出目录
 
 - `data/douban_movies.sqlite3`: SQLite 数据库。
 - `data/raw/`: 原始 CSV/JSON 备份。
@@ -70,7 +84,7 @@ $env:DOUBAN_COOKIE_WAIT_SECONDS="8"
 - `doc/`: Word/PDF 实验报告。
 - `docs/`: 已提交到仓库的 GitHub Pages 静态发布快照。
 
-## GitHub Actions
+## ⚙️ GitHub Actions
 
 工作流文件：
 
@@ -92,7 +106,7 @@ $env:DOUBAN_COOKIE_WAIT_SECONDS="8"
 
 默认定时任务不执行全量高频爬取，只做低频分析刷新。
 
-## 项目结构
+## 🗂️ 项目结构
 
 ```text
 .
@@ -107,7 +121,7 @@ $env:DOUBAN_COOKIE_WAIT_SECONDS="8"
 └── tests/                      # 测试
 ```
 
-## 合规说明
+## 🛡️ 合规说明
 
 - 项目用于课程实验和数据分析展示。
 - 默认遵守目标站点 `robots.txt` 和访问频率限制。
