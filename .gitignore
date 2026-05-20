@@ -1,23 +1,35 @@
-.venv/
+# Python / tooling caches
+/.venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.mypy_cache/
-.scrapy/
+/.pytest_cache/
+/.mypy_cache/
+/.scrapy/
 
-data/raw/
-data/processed/
-output/
-posters/
-logs/
-tmp/
-doc/
+# Generated crawl data and local runtime artifacts
+/data/raw/
+/data/processed/
+/data/douban_movies.sqlite3
+/output/
+/posters/
+/logs/
+/tmp/
 
+# Generated reports kept out of normal source commits
+/doc/
+/latex_report/
+
+# GitHub Pages published snapshot. Keep this tracked.
+!/docs/
+!/docs/**
+
+# Databases, logs, and stream exports
 *.db
 *.sqlite
 *.sqlite3
 *.log
 *.jsonl
 
-.idea/
-.vscode/
+# Local editor metadata
+/.idea/
+/.vscode/
